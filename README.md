@@ -299,4 +299,4 @@ flowchart TD
 * **ServerPhysicsManager.cs**: Unity 의존성을 제거한 결정론적 물리 엔진 래퍼.  
 * **DeltaCompressionManager.cs**: 비트 연산 기반의 스냅샷 델타 압축 로직.  
 * **SecurityManager.cs**: RSA/AES 암호화 및 핸드셰이크 상태 머신.
-* **NetworkDataConverter.cs**: GC 최적화 기반 제네릭 공용 메서드 로직.
+* **NetworkDataConverter.cs**: GC 최적화 기반 제네릭 공용 메서드 (직렬화/역직렬화 유틸리티).

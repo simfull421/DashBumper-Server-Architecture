@@ -105,7 +105,7 @@ sequenceDiagram
         
     deactivate SPM
     Note over SGFM: 2. 물리 결과 동기화 (SyncToTransform)
-    end
+    
 
 ### **2. Network Handshake & Security**
 
@@ -229,7 +229,7 @@ flowchart TD
     end
 
     Swap --> Loop
-    end
+    
 ## **🚀 Key Features & Solutions**
 
 ### **1. Zero Allocation & GC Optimization**

@@ -10,7 +10,7 @@
 * **Project Name:** DashBumper  
 * **Role:** 1인 개발 (Server Architecture, Network Logic, Client Prediction)  
 * **Dev Period:** 2025.09.04 ~ 2025.12.04  
-* **Video Demo:** https://youtu.be/V8DBk1QB_2Q?si=_gSnBMdd8yxF3Xi9
+* **Video Demo:** https://youtu.be/V8DBk1QB_2Q
 
 ### **🎯 Core Objectives**
 

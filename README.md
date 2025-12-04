@@ -195,6 +195,7 @@ sequenceDiagram
 ### **4. Server Tick Cycle**
 
 게임의 상태 갱신, 물리 시뮬레이션, 네트워크 동기화가 이루어지는 메인 루프입니다.
+
 ```mermaid
 flowchart TD
     Start(("Server Start")) --> Init["Initialize Managers<br/>(VContainer)"]
@@ -227,8 +228,6 @@ flowchart TD
             Send --> ClearEvents["Clear Events"]
             ClearEvents --> Swap["Swap Read/Write Buffers"]
         end
-    end
-
     Swap --> Loop
     ```
 ## **🚀 Key Features & Solutions**

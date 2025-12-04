@@ -105,6 +105,7 @@ sequenceDiagram
         
     deactivate SPM
     Note over SGFM: 2. 물리 결과 동기화 (SyncToTransform)
+```
     
 
 ### **2. Network Handshake & Security**
@@ -146,7 +147,7 @@ sequenceDiagram
     ServerUDP->>ServerUDP: 14. Verify HMAC & Decrypt
     ServerUDP->>Client: 15. DeltaSnapshot (Tick 100)
     end
-
+```
 ### **3. Server Connecting Cycle**
 
 클라이언트가 해당 게임의 포톤 서버와 관제탑 매칭 요청을 통한 상태 전환과 접속 흐름입니다.
@@ -187,7 +188,7 @@ sequenceDiagram
         MM->>GameServer: PacketRouteManager.SendSecurityReadySignal()
         GameServer-->>MM: (Handshake Process...)
     end
-
+```
     
 
 
@@ -229,7 +230,7 @@ flowchart TD
     end
 
     Swap --> Loop
-    
+    ```
 ## **🚀 Key Features & Solutions**
 
 ### **1. Zero Allocation & GC Optimization**

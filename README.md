@@ -231,8 +231,7 @@ flowchart TD
     end
 
     Swap --> Loop
-
-    ```
+```
 
 
 ## **🚀 Key Features & Solutions**

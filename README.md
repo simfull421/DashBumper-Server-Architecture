@@ -106,6 +106,7 @@ sequenceDiagram
     deactivate SPM
     Note over SGFM: 2. 물리 결과 동기화 (SyncToTransform)
     end
+
 ### **2. Network Handshake & Security**
 
 TCP로 안전하게 세션 키를 교환한 후, UDP 통신으로 전환하는 하이브리드 핸드셰이크 구조입니다.

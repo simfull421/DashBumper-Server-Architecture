@@ -228,7 +228,10 @@ flowchart TD
             Send --> ClearEvents["Clear Events"]
             ClearEvents --> Swap["Swap Read/Write Buffers"]
         end
+    end
+
     Swap --> Loop
+
     ```
 ## **🚀 Key Features & Solutions**
 

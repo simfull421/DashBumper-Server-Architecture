@@ -133,21 +133,21 @@ flowchart TD
 
 ---
 
-## **7\. Source Code Highlights & Engineering Decisions**
+## 7. Source Code Highlights & Engineering Decisions
 
-### **① DeltaCompressionManager.cs (Traffic Optimization)**
+### ① DeltaCompressionManager.cs (Traffic Optimization)
+> **[핵심]** 매 틱(Tick)마다 전체 데이터를 보내는 대신, 이전 프레임과 비교하여 **변경된 값만 비트 플래그(Bitmask)로 마킹**하여 전송합니다.
 
-**💡 핵심 로직:** 매 틱(Tick)마다 전체 데이터를 보내는 대신, 이전 프레임과 비교하여 변경된 값만 \*\*비트 플래그(Bitmask)\*\*로 마킹하여 전송합니다.
-
-// \[Bitwise Operation Logic\]  
-// 위치 오차(0.00001f)가 발생한 경우에만 비트 플래그(OR 연산)를 세움  
-if (Vector2.SqrMagnitude(current.Position \- prev.Position) \> 0.00001f)  
-{  
-    deltaState.Changes |= PlayerStateChanges.Position; // Flag On  
-    deltaState.Position \= current.Position;  
-}  
+```csharp
+// [Bitwise Operation Logic]
+// 위치 오차(0.00001f)가 발생한 경우에만 비트 플래그(OR 연산)를 세움
+if (Vector2.SqrMagnitude(current.Position - prev.Position) > 0.00001f)
+{
+    deltaState.Changes |= PlayerStateChanges.Position; // Flag On
+    deltaState.Position = current.Position;
+}
 // 변경되지 않은 데이터는 전송하지 않음 (Skip)
-
+```
 ### **② GameManager.cs (Server Core Loop)**
 
 **💡 핵심 로직:** 서버의 메인 루프를 입력 처리 → 물리 연산 → 스냅샷 생성 → 전송 → 메모리 스왑 순서로 엄격하게 제어합니다. 특히 마지막에 \*\*Read/Write 버퍼를 교체(Swap)\*\*하여 런타임 메모리 할당을 방지했습니다.

@@ -29,210 +29,65 @@
 | **Network** | TCP/UDP Custom Protocol, MessagePipe, UniRx |
 | **Security** | AES Encryption, HMAC Authentication |
 
-## **📂 System Architecture**
+## **📂 System Architecture Overview**
 
-### **1. Server Loop & Physics Flow**
-
-서버의 메인 루프는 물리 연산(Velcro)과 게임 로직을 엄격하게 분리하여 순차적으로 처리합니다. 물리 엔진의 콜백을 이벤트로 변환하여 로직단에서 처리함으로써 결합도를 낮췄습니다.
-```mermaid
-sequenceDiagram
-    autonumber
-    
-    box rgb(100, 100, 251) Server Loop
-    participant SGFM as ServerGameFlowManager
-    end
-
-    box rgb(40, 40, 60) Physics Engine (Deterministic)
-    participant SPM as ServerPhysicsManager
-    participant Velcro as Velcro World (Core)
-    participant Wrapper as VelcroBodyWrapper
-    end
-
-    box rgb(222, 222, 220) Event System
-    participant MsgPipe as MessagePipe
-    participant CM as CollisionManager
-    end
-
-    box rgb(255, 200, 200) Game Logic
-    participant IS as ImpactService
-    end
-
-    Note over SGFM: 1. 물리 시뮬레이션 시작
-    SGFM->>SPM: Step(fixedDeltaTime)
-    activate SPM
-        
-        SPM->>Velcro: Step(dt)
-        activate Velcro
-            Note right of Velcro: 물리 연산 수행<br/>(위치 갱신, 충돌 감지)
-            
-            %% Velcro 내부에서 충돌 발생 시 콜백 호출
-            Velcro-->>SPM: OnBodyCollision(FixtureA, FixtureB)
-            activate SPM
-                Note right of SPM: Unity 의존성 없는<br/>순수 데이터 변환
-                SPM->>MsgPipe: Publish(PhysicsCollisionEvent)
-                activate MsgPipe
-                    
-                    MsgPipe->>CM: HandlePhysicsCollision(Event)
-                    activate CM
-                        
-                        Note right of CM: GC-Zero 필터링<br/>(NativeHashSet)
-                        CM->>CM: Check Duplicate Pair
-                        
-                        CM->>IS: ResolveImpact(BodyA, BodyB)
-                        activate IS
-                            
-                            Note right of IS: 충돌 타입 판별<br/>(Player vs Player)
-                            
-                            IS->>IS: Calculate Knockback & Stun
-                            
-                            Note right of IS: 반동(Force) 적용
-                            
-                            %% 다시 물리 바디에 힘 적용 (순환 구조)
-                            IS->>Wrapper: ApplyLinearImpulse(Force)
-                            activate Wrapper
-                                Wrapper->>Wrapper: Vector2 변환 (Unity -> Velcro)
-                                Wrapper->>Velcro: Body.ApplyLinearImpulse()
-                            deactivate Wrapper
-                            
-                            IS->>Wrapper: ApplyStun() (Update Context)
-                        deactivate IS
-
-                    deactivate CM
-                deactivate MsgPipe
-            deactivate SPM
-        
-        deactivate Velcro
-        
-    deactivate SPM
-    Note over SGFM: 2. 물리 결과 동기화 (SyncToTransform)
-```
-    
-
-### **2. Network Handshake & Security**
-
-TCP로 안전하게 세션 키를 교환한 후, UDP 통신으로 전환하는 하이브리드 핸드셰이크 구조입니다.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client as Client
-    participant Photon as Photon Lobby
-    participant ServerTCP as TcpSocketManager
-    participant ServerLogic as SecurityManager
-    participant ServerUDP as UdpSocketManager
-
-    Note over Client, ServerTCP: [Phase 1] TCP Connection & Token
-    Client->>Photon: 1. Join Room
-    Client->>ServerTCP: 2. Connect (Port 7777)
-    Client->>ServerTCP: 3. Send Code 30 (TcpHandshake) + Token(Photon)
-    ServerTCP->>ServerLogic: 4. Verify Tcp Token
-    ServerLogic-->>Client: 5. Send UDP Token (via Photon RPC) & Req AES Key
-
-    Note over Client, ServerUDP: [Phase 2] UDP Punch & Security
-    loop UDP Retry (ClientHandshakeService)
-        Client->>ServerUDP: 6. Send Code 10 (UdpHandshake) + UDP Token
-    end
-    ServerUDP->>ServerLogic: 7. Verify UDP Token & Register EndPoint
-    
-    Note over Client, ServerLogic: [Phase 3] AES Key Exchange (TCP Payload)
-    Client->>Client: 8. Generate AES Key & Encrypt with Server RSA PubKey
-    Client->>ServerTCP: 9. Send Encrypted AES Key (TCP Packet)
-    ServerTCP->>ServerLogic: 10. Decrypt AES Key (RSA PrivKey) & Store
-    ServerLogic->>ServerLogic: 11. Check All Ready (TCP+UDP+AES)
-    ServerLogic-->>Client: 12. Send Ack (Security Established)
-
-    rect rgb(200, 500, 200)
-    Note over Client, ServerUDP: [Phase 4] In-Game (Encrypted UDP)
-    Client->>ServerUDP: 13. PlayerInputData (AES Encrypted + HMAC)
-    ServerUDP->>ServerUDP: 14. Verify HMAC & Decrypt
-    ServerUDP->>Client: 15. DeltaSnapshot (Tick 100)
-    end
-```
-### **3. Server Connecting Cycle**
-
-클라이언트가 해당 게임의 포톤 서버와 관제탑 매칭 요청을 통한 상태 전환과 접속 흐름입니다.
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant Lobby as LobbyPanel
-    participant NM as NetworkManager
-    participant MM as MatchmakingManager
-    participant HTTP as Control Tower (Web Server)
-    participant Photon as Photon Cloud
-    participant GameServer as Dedicated Server
-
-    Note over User, Photon: [Phase 1] 초기화 및 마스터 서버 접속
-    User->>NM: Start Game
-    NM->>Photon: PhotonNetwork.ConnectUsingSettings()
-    Photon-->>NM: OnConnectedToMaster()
-    NM->>Photon: JoinLobby()
-    Photon-->>NM: OnJoinedLobby()
-    NM-->>Lobby: Activate "Find Match" Button
-
-    Note over User, HTTP: [Phase 2] 관제탑 매칭 요청 (HTTP)
-    User->>Lobby: Click "Find Match"
-    Lobby->>MM: FindRandomMatch()
-    MM->>HTTP: POST /findMatch (Region, Rank...)
-    activate HTTP
-    Note right of MM: Retry Logic (Max 3 times)<br/>Backoff applied
-    HTTP-->>MM: 200 OK (MatchInfo: RoomName, Region)
-    deactivate HTTP
-
-    Note over MM, GameServer: [Phase 3] 방 입장 및 서버 접속
-    MM->>Photon: PhotonNetwork.JoinRoom(MatchInfo.RoomName)
-    Photon-->>MM: OnJoinedRoom()
-    
-    rect rgb(220, 2230, 520)
-        Note right of MM: 여기서부터 TCP/UDP 핸드셰이크 시작
-        MM->>GameServer: PacketRouteManager.SendSecurityReadySignal()
-        GameServer-->>MM: (Handshake Process...)
-    end
-```
-    
-
-
-### **4. Server Tick Cycle**
-
-게임의 상태 갱신, 물리 시뮬레이션, 네트워크 동기화가 이루어지는 메인 루프입니다.
+### **TCP/UDP/HTTP가 유기적으로 연동되는 하이브리드 접속 구조**
 
 ```mermaid
 flowchart TD
-    Start(("Server Start")) --> Init["Initialize Managers<br/>(VContainer)"]
-    Init --> Loop{"Game Loop<br/>(FixedUpdate / 30Hz)"}
-    
-    subgraph Tick_Execution [Server Tick Cycle]
-        Loop -->|Tick Start| Time["TimeManager.Tick"]
-        Time --> Unreg["Process Unregister Queue"]
-        
-        subgraph Logic [Simulation]
-            Unreg --> Input["Process Player Inputs<br/>(Apply Velocity)"]
-            Input --> Physics["Simulate World<br/>(Velcro Physics Step)"]
-            Physics --> Sync["Sync Physics to Transform"]
-            Sync --> Context["Update Player Contexts"]
-        end
+    %% 스타일 정의
+    classDef client fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef server fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef security fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
 
-        subgraph Network_Sync [Snapshot & Replication]
-            Context --> LagComp["Record Lag Compensation"]
-            LagComp --> SnapGen["Create Full Snapshot<br/>(WriteBuffer)"]
-            SnapGen --> DeltaCheck{"Has Ack?"}
-            
-            CheckAck -- Yes --> Delta["Create Delta Compression"]
-            CheckAck -- No --> Full["Send Full Snapshot"]
-            
-            Delta --> Send["UDP Send"]
-            Full --> Send
-        end
-
-        subgraph Memory [GC-Zero Optimization]
-            Send --> ClearEvents["Clear Events"]
-            ClearEvents --> Swap["Swap Read/Write Buffers"]
-        end
+    subgraph Client_Side [Client (User)]
+        direction TB
+        Lobby[Lobby Scene]:::client -->|HTTP Req| Match[Control Tower<br/>(Matchmaking)]:::server
+        Lobby -->|Load Scene| GameClient[Game Scene]:::client
     end
 
-    Swap --> Loop
-```
+    subgraph Security_Layer [🛡️ Security Handshake]
+        direction TB
+        GameClient -->|1. TCP| RSA[RSA Key Exch]:::security
+        RSA -->|2. UDP| Token[Token Verify]:::security
+        Token -->|3. AES| AES[AES Session OK]:::security
+    end
 
+    subgraph Dedicated_Server [Linux Server Core]
+        direction TB
+        AES --> Snapshot[Full Snapshot Send]:::server
+        Snapshot --> GameLoop[In-Game Loop<br/>(AES Encrypted UDP)]:::server
+    end
+
+    Match -->|Room Info| Lobby
+    GameClient -.->|Inject Systems| Security_Layer
+    Security_Layer ==>|Secure Pipe| Dedicated_Server
+```
+### **GC Zero를 위한 더블 버퍼링 및 결정론적 물리 루프**
+```mermaid
+flowchart TD
+    %% 스타일 정의
+    classDef cycle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef opt fill:#fff8e1,stroke:#f57f17,stroke-width:2px,stroke-dasharray: 5 5
+
+    subgraph Server_Tick_Cycle [Server Game Loop (30Hz)]
+        direction TB
+        
+        Input(1. Input Processing):::cycle --> Physics(2. Velcro Physics Step):::cycle
+        Physics --> Context(3. Update Context):::cycle
+        
+        subgraph Optimization [⚡ Core Tech]
+            Context --> Delta{Has Ack?}:::opt
+            Delta -- Yes --> XOR[4. Delta Compression<br/>(XOR + Bitmask)]:::opt
+            Delta -- No --> Full[Full Snapshot]:::opt
+        end
+
+        XOR --> Send(5. UDP Send):::cycle
+        Full --> Send
+        Send --> GC[6. GC Zero<br/>Double Buffer Swap]:::cycle
+        GC --> Input
+    end
+```
 
 ## **🚀 Key Features & Solutions**
 

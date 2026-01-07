@@ -42,26 +42,26 @@ flowchart TD
 
     subgraph Client_Side ["Client (User)"]
         direction TB
-        Lobby[Lobby Scene]:::client -->|HTTP Req| Match[Control Tower<br/>(Matchmaking)]:::server
-        Lobby -->|Load Scene| GameClient[Game Scene]:::client
+        Lobby["Lobby Scene"]:::client -->|HTTP Req| Match["Control Tower<br/>(Matchmaking)"]:::server
+        Lobby -->|Load Scene| GameClient["Game Scene"]:::client
     end
 
     subgraph Security_Layer ["🛡️ Security Handshake"]
         direction TB
-        GameClient -->|1. TCP| RSA[RSA Key Exch]:::security
-        RSA -->|2. UDP| Token[Token Verify]:::security
-        Token -->|3. AES| AES[AES Session OK]:::security
+        GameClient -->|"1. TCP"| RSA["RSA Key Exch"]:::security
+        RSA -->|"2. UDP"| Token["Token Verify"]:::security
+        Token -->|"3. AES"| AES["AES Session OK"]:::security
     end
 
     subgraph Dedicated_Server ["Linux Server Core"]
         direction TB
-        AES --> Snapshot[Full Snapshot Send]:::server
-        Snapshot --> GameLoop[In-Game Loop<br/>(AES Encrypted UDP)]:::server
+        AES --> Snapshot["Full Snapshot Send"]:::server
+        Snapshot --> GameLoop["In-Game Loop<br/>(AES Encrypted UDP)"]:::server
     end
 
-    Match -->|Room Info| Lobby
-    GameClient -.->|Inject Systems| Security_Layer
-    Security_Layer ==>|Secure Pipe| Dedicated_Server
+    Match -->|"Room Info"| Lobby
+    GameClient -.->|"Inject Systems"| Security_Layer
+    Security_Layer ==>|"Secure Pipe"| Dedicated_Server
 ```
 ### **GC Zero를 위한 더블 버퍼링 및 결정론적 물리 루프**
 ```mermaid
@@ -73,18 +73,18 @@ flowchart TD
     subgraph Server_Tick_Cycle ["Server Game Loop (30Hz)"]
         direction TB
         
-        Input(1. Input Processing):::cycle --> Physics(2. Velcro Physics Step):::cycle
-        Physics --> Context(3. Update Context):::cycle
+        Input("1. Input Processing"):::cycle --> Physics("2. Velcro Physics Step"):::cycle
+        Physics --> Context("3. Update Context"):::cycle
         
         subgraph Optimization ["⚡ Core Tech"]
-            Context --> Delta{Has Ack?}:::opt
-            Delta -- Yes --> XOR[4. Delta Compression<br/>(XOR + Bitmask)]:::opt
-            Delta -- No --> Full[Full Snapshot]:::opt
+            Context --> Delta{"Has Ack?"}:::opt
+            Delta -- "Yes" --> XOR["4. Delta Compression<br/>(XOR + Bitmask)"]:::opt
+            Delta -- "No" --> Full["Full Snapshot"]:::opt
         end
 
-        XOR --> Send(5. UDP Send):::cycle
+        XOR --> Send("5. UDP Send"):::cycle
         Full --> Send
-        Send --> GC[6. GC Zero<br/>Double Buffer Swap]:::cycle
+        Send --> GC["6. GC Zero<br/>Double Buffer Swap"]:::cycle
         GC --> Input
     end
 ```

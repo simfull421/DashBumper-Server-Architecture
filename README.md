@@ -22,9 +22,11 @@
 * **Network:** TCP/UDP Custom Protocol, MessagePipe, UniRx
 * **Core Lib:** `VelcroPhysics` (Deterministic), `RecyclableMemoryStream`, `VContainer` (DI)
 
-### **TCP/UDP/HTTP가 유기적으로 연동되는 하이브리드 접속 구조**
 
-```mermaid
+## 4. System Architecture Overview
+
+### ① TCP/UDP/HTTP 하이브리드 접속 구조
+> ```mermaid
 flowchart TD
     %% 스타일 정의
     classDef client fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
@@ -54,8 +56,10 @@ flowchart TD
     GameClient -.->|"Inject Systems"| Security_Layer
     Security_Layer ==>|"Secure Pipe"| Dedicated_Server
 ```
-### **GC Zero를 위한 더블 버퍼링 및 결정론적 물리 루프**
-```mermaid
+> *관제탑 매칭부터 보안 핸드셰이크, 인게임 진입까지의 연결 흐름도*
+
+### ② GC Zero 및 결정론적 물리 루프
+> ```mermaid
 flowchart TD
     %% 스타일 정의
     classDef cycle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
@@ -79,15 +83,6 @@ flowchart TD
         GC --> Input
     end
 ```
-
-## 4. System Architecture Overview
-
-### ① TCP/UDP/HTTP 하이브리드 접속 구조
-> **[여기에 첫 번째 다이어그램(Macro) 이미지를 넣어주세요]**
-> *관제탑 매칭부터 보안 핸드셰이크, 인게임 진입까지의 연결 흐름도*
-
-### ② GC Zero 및 결정론적 물리 루프
-> **[여기에 두 번째 다이어그램(Micro) 이미지를 넣어주세요]**
 > *더블 버퍼링과 델타 압축이 적용된 서버 코어 틱(Tick) 아키텍처*
 
 ---

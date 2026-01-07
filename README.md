@@ -147,7 +147,7 @@ if (Vector2.SqrMagnitude(current.Position - prev.Position) > 0.00001f)
     deltaState.Position = current.Position;
 }
 // 변경되지 않은 데이터는 전송하지 않음 (Skip)
-
+---
 
 ### ② GameManager.cs (Server Core Loop)
 >  서버의 메인 루프를 입력 처리 → 물리 연산 → 스냅샷 생성 → 전송 → 메모리 스왑의 순서로 엄격하게 제어합니다. 특히 마지막에 Read/Write 버퍼를 교체(Swap)하여 런타임 메모리 할당을 방지했습니다.
@@ -168,7 +168,7 @@ private void ServerTick()
     _currentWriteBuffer = _currentReadBuffer;
     _currentReadBuffer = temp;
 }
-
+---
 ### ③ NetworkDataConverter.cs (GC Zero Serialization)
 >  [핵심] C#의 class 대신 struct만을 직렬화하도록 제네릭 제약조건(where T : struct)을 걸어 Boxing/Unboxing을 원천 차단했습니다. 또한 RecyclableMemoryStream을 사용하여 바이트 배열 할당을 없앴습니다.
 
@@ -182,7 +182,7 @@ public static bool TryDeserializeInto<T>(byte[] data, ref T target)
     target.Deserialize(data, ref offset); 
     return true;
 }
-
+---
 ### ④ RootInstaller.cs (System Architecture)
 >  [핵심] VContainer를 활용해 의존성 주입(DI) 환경을 구축했습니다. 특히 MessagePipe를 전역으로 등록하여, 게임 로직(Sender)과 네트워크 모듈(Receiver)이 서로를 모르더라도 통신 가능한 **느슨한 결합(Decoupling)**을 구현했습니다.
 
@@ -196,7 +196,7 @@ builder.RegisterMessageBroker<FullSnapshotEvent>(options);
 builder.Register<ClientUdpSocket>(Lifetime.Singleton).As<IClientUdpSocket>();
 builder.RegisterInstance<ICryptoTransform>(encryptor);
 
-
+---
 ### ⑤ SecurityManager.cs (Hybrid Security)
 > [핵심] 성능과 보안의 트레이드오프를 해결하기 위해 **RSA(비대칭키)**로 초기 세션을 맺고, 이후 **AES(대칭키)**로 전환하는 하이브리드 핸드셰이크 방식을 적용했습니다.
 
@@ -211,7 +211,7 @@ if (decryptedKey != null)
     _playerAesKeys[actorNumber] = (decryptedKey, iv);
     _aesReadyPublisher.Publish(new SecurityChannelEstablishedEvent(actorNumber));
 }
-
+---
 ### ⑥ ServerPhysicsManager.cs (Deterministic Engine)
 > [핵심] Unity의 PhysX는 비결정론적이므로, 순수 C# 물리 엔진인 VelcroPhysics를 도입했습니다. 이때 **어댑터 패턴(Adapter Pattern)**을 사용하여 외부 로직은 물리 엔진의 교체 여부와 관계없이 동작하도록 설계했습니다.
 
@@ -230,3 +230,4 @@ private class VelcroBodyWrapper : IPhysicsBody
         }
     }
 }
+---

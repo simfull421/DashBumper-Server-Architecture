@@ -26,7 +26,8 @@
 ## 4. System Architecture Overview
 
 ### ① TCP/UDP/HTTP 하이브리드 접속 구조
-> ```mermaid
+
+```mermaid
 flowchart TD
     %% 스타일 정의
     classDef client fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
@@ -59,7 +60,7 @@ flowchart TD
 > *관제탑 매칭부터 보안 핸드셰이크, 인게임 진입까지의 연결 흐름도*
 
 ### ② GC Zero 및 결정론적 물리 루프
-> ```mermaid
+```mermaid
 flowchart TD
     %% 스타일 정의
     classDef cycle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px

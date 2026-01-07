@@ -40,20 +40,20 @@ flowchart TD
     classDef server fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
     classDef security fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
 
-    subgraph Client_Side [Client (User)]
+    subgraph Client_Side ["Client (User)"]
         direction TB
         Lobby[Lobby Scene]:::client -->|HTTP Req| Match[Control Tower<br/>(Matchmaking)]:::server
         Lobby -->|Load Scene| GameClient[Game Scene]:::client
     end
 
-    subgraph Security_Layer [🛡️ Security Handshake]
+    subgraph Security_Layer ["🛡️ Security Handshake"]
         direction TB
         GameClient -->|1. TCP| RSA[RSA Key Exch]:::security
         RSA -->|2. UDP| Token[Token Verify]:::security
         Token -->|3. AES| AES[AES Session OK]:::security
     end
 
-    subgraph Dedicated_Server [Linux Server Core]
+    subgraph Dedicated_Server ["Linux Server Core"]
         direction TB
         AES --> Snapshot[Full Snapshot Send]:::server
         Snapshot --> GameLoop[In-Game Loop<br/>(AES Encrypted UDP)]:::server
@@ -70,13 +70,13 @@ flowchart TD
     classDef cycle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef opt fill:#fff8e1,stroke:#f57f17,stroke-width:2px,stroke-dasharray: 5 5
 
-    subgraph Server_Tick_Cycle [Server Game Loop (30Hz)]
+    subgraph Server_Tick_Cycle ["Server Game Loop (30Hz)"]
         direction TB
         
         Input(1. Input Processing):::cycle --> Physics(2. Velcro Physics Step):::cycle
         Physics --> Context(3. Update Context):::cycle
         
-        subgraph Optimization [⚡ Core Tech]
+        subgraph Optimization ["⚡ Core Tech"]
             Context --> Delta{Has Ack?}:::opt
             Delta -- Yes --> XOR[4. Delta Compression<br/>(XOR + Bitmask)]:::opt
             Delta -- No --> Full[Full Snapshot]:::opt

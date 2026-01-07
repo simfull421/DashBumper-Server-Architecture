@@ -133,101 +133,102 @@ flowchart TD
 
 ---
 
-## 7. Source Code Highlights & Engineering Decisions
+## **7. Source Code Highlights & Engineering Decisions**
 
-### ① DeltaCompressionManager.cs (Traffic Optimization)
->  매 틱(Tick)마다 전체 데이터를 보내는 대신, 이전 프레임과 비교하여 **변경된 값만 비트 플래그(Bitmask)로 마킹**하여 전송
+### **① DeltaCompressionManager.cs (Traffic Optimization)**
 
-```csharp
-// [Bitwise Operation Logic]
-// 위치 오차(0.00001f)가 발생한 경우에만 비트 플래그(OR 연산)를 세움
-if (Vector2.SqrMagnitude(current.Position - prev.Position) > 0.00001f)
-{
-    deltaState.Changes |= PlayerStateChanges.Position; // Flag On
-    deltaState.Position = current.Position;
-}
+**💡 핵심 로직:** 매 틱(Tick)마다 전체 데이터를 보내는 대신, 이전 프레임과 비교하여 변경된 값만 **비트 플래그(Bitmask)**로 마킹하여 전송합니다.
+
+// [Bitwise Operation Logic]  
+// 위치 오차(0.00001f)가 발생한 경우에만 비트 플래그(OR 연산)를 세움  
+if (Vector2.SqrMagnitude(current.Position - prev.Position) > 0.00001f)  
+{  
+    deltaState.Changes |= PlayerStateChanges.Position; // Flag On  
+    deltaState.Position = current.Position;  
+}  
 // 변경되지 않은 데이터는 전송하지 않음 (Skip)
----
 
-### ② GameManager.cs (Server Core Loop)
->  서버의 메인 루프를 입력 처리 → 물리 연산 → 스냅샷 생성 → 전송 → 메모리 스왑의 순서로 엄격하게 제어합니다. 특히 마지막에 Read/Write 버퍼를 교체(Swap)하여 런타임 메모리 할당을 방지했습니다.
-```csharp
-// [Server Tick Cycle]
-private void ServerTick()
-{
-    // 1. 입력 처리 및 물리 시뮬레이션 (순차 실행)
-    ProcessPlayerInputs();
-    SimulateWorld(); // Velcro Physics Step
+### **② GameManager.cs (Server Core Loop)**
 
-    // 2. 스냅샷 생성 및 델타 압축 전송
-    CreateCurrentGameStateSnapshot(_currentWriteBuffer, _currentTick);
-    _deltaCompressionManager.CreateAndDispatchDeltaPackets(...);
+**💡 핵심 로직:** 서버의 메인 루프를 입력 처리 → 물리 연산 → 스냅샷 생성 → 전송 → 메모리 스왑 순서로 엄격하게 제어합니다. 특히 마지막에 **Read/Write 버퍼를 교체(Swap)**하여 런타임 메모리 할당을 방지했습니다.
 
-    // 3. [GC Zero] Double Buffer Swap (포인터만 교체)
-    var temp = _currentWriteBuffer;
-    _currentWriteBuffer = _currentReadBuffer;
-    _currentReadBuffer = temp;
+// [Server Tick Cycle]  
+private void ServerTick()  
+{  
+    // 1. 입력 처리 및 물리 시뮬레이션 (순차 실행)  
+    ProcessPlayerInputs();  
+    SimulateWorld(); // Velcro Physics Step
+
+    // 2. 스냅샷 생성 및 델타 압축 전송  
+    CreateCurrentGameStateSnapshot(_currentWriteBuffer, _currentTick);  
+    _deltaCompressionManager.CreateAndDispatchDeltaPackets(...);
+
+    // 3. [GC Zero] Double Buffer Swap (포인터만 교체)  
+    var temp = _currentWriteBuffer;  
+    _currentWriteBuffer = _currentReadBuffer;  
+    _currentReadBuffer = temp;  
 }
----
-### ③ NetworkDataConverter.cs (GC Zero Serialization)
->  [핵심] C#의 class 대신 struct만을 직렬화하도록 제네릭 제약조건(where T : struct)을 걸어 Boxing/Unboxing을 원천 차단했습니다. 또한 RecyclableMemoryStream을 사용하여 바이트 배열 할당을 없앴습니다.
 
-```csharp
-// [Generic Constraint & Memory Pooling]
-public static bool TryDeserializeInto<T>(byte[] data, ref T target) 
-    where T : struct, IBinarizable // 구조체 강제 (Heap 할당 방지)
-{
-    // ArrayPool에서 빌려온 버퍼를 사용하여 스트림 생성 없이 직접 역직렬화
-    int offset = 0;
-    target.Deserialize(data, ref offset); 
-    return true;
+### **③ NetworkDataConverter.cs (GC Zero Serialization)**
+
+**💡 핵심 로직:** C#의 class 대신 struct만을 직렬화하도록 **제네릭 제약조건(where T : struct)**을 걸어 Boxing/Unboxing을 원천 차단했습니다. 또한 RecyclableMemoryStream을 사용하여 바이트 배열 할당을 없앴습니다.
+
+// [Generic Constraint & Memory Pooling]  
+public static bool TryDeserializeInto<T>(byte[] data, ref T target)   
+    where T : struct, IBinarizable // 구조체 강제 (Heap 할당 방지)  
+{  
+    // ArrayPool에서 빌려온 버퍼를 사용하여 스트림 생성 없이 직접 역직렬화  
+    int offset = 0;  
+    target.Deserialize(data, ref offset);   
+    return true;  
 }
----
-### ④ RootInstaller.cs (System Architecture)
->  [핵심] VContainer를 활용해 의존성 주입(DI) 환경을 구축했습니다. 특히 MessagePipe를 전역으로 등록하여, 게임 로직(Sender)과 네트워크 모듈(Receiver)이 서로를 모르더라도 통신 가능한 **느슨한 결합(Decoupling)**을 구현했습니다.
 
-```csharp
-// [Dependency Injection Setup]
-// Event Bus 패턴을 위한 MessagePipe 등록
-var options = builder.RegisterMessagePipe();
+### **④ RootInstaller.cs (System Architecture)**
+
+**💡 핵심 로직:** VContainer를 활용해 의존성 주입(DI) 환경을 구축했습니다. 특히 MessagePipe를 전역으로 등록하여, 게임 로직(Sender)과 네트워크 모듈(Receiver)이 서로를 모르더라도 통신 가능한 **느슨한 결합(Decoupling)**을 구현했습니다.
+
+// [Dependency Injection Setup]  
+// Event Bus 패턴을 위한 MessagePipe 등록  
+var options = builder.RegisterMessagePipe();  
 builder.RegisterMessageBroker<FullSnapshotEvent>(options); 
 
-// 네트워크 소켓과 암호화 모듈을 싱글톤(Singleton)으로 등록하여 씬 전환 시 유지
-builder.Register<ClientUdpSocket>(Lifetime.Singleton).As<IClientUdpSocket>();
+// 네트워크 소켓과 암호화 모듈을 싱글톤(Singleton)으로 등록하여 씬 전환 시 유지  
+builder.Register<ClientUdpSocket>(Lifetime.Singleton).As<IClientUdpSocket>();  
 builder.RegisterInstance<ICryptoTransform>(encryptor);
 
----
-### ⑤ SecurityManager.cs (Hybrid Security)
-> [핵심] 성능과 보안의 트레이드오프를 해결하기 위해 **RSA(비대칭키)**로 초기 세션을 맺고, 이후 **AES(대칭키)**로 전환하는 하이브리드 핸드셰이크 방식을 적용했습니다.
+### **⑤ SecurityManager.cs (Hybrid Security)**
 
-```csharp
-// [Secure Handshake Logic]
-// 클라이언트의 AES 키를 서버의 RSA 개인키로 복호화
+**💡 핵심 로직:** 성능과 보안의 트레이드오프를 해결하기 위해 **RSA(비대칭키)**로 초기 세션을 맺고, 이후 **AES(대칭키)**로 전환하는 하이브리드 핸드셰이크 방식을 적용했습니다.
+
+// [Secure Handshake Logic]  
+// 클라이언트의 AES 키를 서버의 RSA 개인키로 복호화  
 byte[] decryptedKey = DecryptWithPrivateKey(encryptedKey);
 
-if (decryptedKey != null)
-{
-    // AES 키 등록 및 보안 채널 확립 선언 (이후 UDP 통신 허용)
-    _playerAesKeys[actorNumber] = (decryptedKey, iv);
-    _aesReadyPublisher.Publish(new SecurityChannelEstablishedEvent(actorNumber));
+if (decryptedKey != null)  
+{  
+    // AES 키 등록 및 보안 채널 확립 선언 (이후 UDP 통신 허용)  
+    _playerAesKeys[actorNumber] = (decryptedKey, iv);  
+    _aesReadyPublisher.Publish(new SecurityChannelEstablishedEvent(actorNumber));  
 }
----
-### ⑥ ServerPhysicsManager.cs (Deterministic Engine)
-> [핵심] Unity의 PhysX는 비결정론적이므로, 순수 C# 물리 엔진인 VelcroPhysics를 도입했습니다. 이때 **어댑터 패턴(Adapter Pattern)**을 사용하여 외부 로직은 물리 엔진의 교체 여부와 관계없이 동작하도록 설계했습니다.
 
-```csharp
-// [Adapter Pattern Implementation]
-// Unity Vector2 <-> Velcro Vector2 변환을 캡슐화
-private class VelcroBodyWrapper : IPhysicsBody
-{
-    public UnityEngine.Vector2 Position
-    {
-        get => new UnityEngine.Vector2(InternalBody.Position.X, InternalBody.Position.Y);
-        set 
-        {
-            var newPos = new Microsoft.Xna.Framework.Vector2(value.x, value.y);
-            InternalBody.SetTransformIgnoreContacts(ref newPos, InternalBody.Rotation);
-        }
-    }
-}
----
+### **⑥ ServerPhysicsManager.cs (Deterministic Engine)**
+
+**💡 핵심 로직:** Unity의 PhysX는 비결정론적이므로, 순수 C# 물리 엔진인 VelcroPhysics를 도입했습니다. 이때 **어댑터 패턴(Adapter Pattern)**을 사용하여 외부 로직은 물리 엔진의 교체 여부와 관계없이 동작하도록 설계했습니다.
+
+// [Adapter Pattern Implementation]  
+// Unity Vector2 <-> Velcro Vector2 변환을 캡슐화  
+private class VelcroBodyWrapper : IPhysicsBody  
+{  
+    public UnityEngine.Vector2 Position  
+    {  
+        get => new UnityEngine.Vector2(InternalBody.Position.X, InternalBody.Position.Y);  
+        set   
+        {  
+            var newPos = new Microsoft.Xna.Framework.Vector2(value.x, value.y);  
+            InternalBody.SetTransformIgnoreContacts(ref newPos, InternalBody.Rotation);  
+        }  
+    }  
+}  
+
+
+이것만 역슬래시만 제거해서 그대로 보여줘봐. 그리고 깔끔한 이전 형식 그대로 사용해야해. ai가 작용된것처럼 보이면 안된다고.
